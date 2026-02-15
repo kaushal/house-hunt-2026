@@ -2,8 +2,6 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-import base64
-from pathlib import Path
 
 st.set_page_config(
     page_title="House Hunt 2026",
@@ -341,12 +339,6 @@ PROPERTIES = {
 # ---------------------------------------------------------------------------
 
 
-def img_to_data_uri(path: str) -> str:
-    data = Path(path).read_bytes()
-    b64 = base64.b64encode(data).decode()
-    return f"data:image/png;base64,{b64}"
-
-
 def monthly_mortgage(principal: float, annual_rate_pct: float, years: int) -> float:
     if annual_rate_pct == 0:
         return principal / (years * 12)
@@ -442,25 +434,23 @@ st.markdown("""
 card_cols = st.columns(3, gap="medium")
 for idx, (name, prop) in enumerate(PROPERTIES.items()):
     with card_cols[idx]:
-        uri = img_to_data_uri(prop["image"])
         badge_html = ""
         if prop.get("tax_abatement_note"):
             badge_html = f'<div class="badge">{prop["tax_abatement_note"]}</div>'
+        st.markdown('<div class="prop-card">', unsafe_allow_html=True)
+        st.image(prop["image"], use_container_width=True)
         st.markdown(f"""
-        <div class="prop-card">
-            <img src="{uri}" alt="{prop['address']}" />
-            <div class="prop-card-body">
-                <div class="neighborhood">{prop['neighborhood']}</div>
-                <h3>{prop['address']}</h3>
-                <div class="details">
-                    {prop['beds']} bed &middot; {prop['baths']} bath &middot; {prop['sqft']:,} SF &middot; Built {prop['year_built']}
-                </div>
-                <div class="price">${prop['price']:,.0f}</div>
-                <div class="ppsf">${prop['price']/prop['sqft']:,.0f} / SF</div>
-                {badge_html}
-                <br/>
-                <a class="se-link" href="{prop['streeteasy']}" target="_blank">View on StreetEasy &rarr;</a>
+        <div class="prop-card-body">
+            <div class="neighborhood">{prop['neighborhood']}</div>
+            <h3>{prop['address']}</h3>
+            <div class="details">
+                {prop['beds']} bed &middot; {prop['baths']} bath &middot; {prop['sqft']:,} SF &middot; Built {prop['year_built']}
             </div>
+            <div class="price">${prop['price']:,.0f}</div>
+            <div class="ppsf">${prop['price']/prop['sqft']:,.0f} / SF</div>
+            {badge_html}
+            <a class="se-link" href="{prop['streeteasy']}" target="_blank">View on StreetEasy &rarr;</a>
+        </div>
         </div>
         """, unsafe_allow_html=True)
 
