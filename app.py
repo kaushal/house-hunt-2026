@@ -392,7 +392,7 @@ with st.sidebar:
 
     st.markdown('<div class="section-head">Market Assumptions</div>', unsafe_allow_html=True)
     appreciation_rate = st.slider("Annual Appreciation (%)", -5.0, 10.0, 3.0, 0.25)
-    projection_years = st.slider("Projection Horizon (years)", 5, 30, 10, 1)
+    projection_years = st.slider("Projection Horizon (years)", 5, 30, 30, 1)
 
     st.markdown('<div class="section-head">Down Payment</div>', unsafe_allow_html=True)
     down_pcts = {}
