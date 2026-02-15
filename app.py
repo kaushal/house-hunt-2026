@@ -449,10 +449,10 @@ for idx, (name, prop) in enumerate(PROPERTIES.items()):
             <div class="price">${prop['price']:,.0f}</div>
             <div class="ppsf">${prop['price']/prop['sqft']:,.0f} / SF</div>
             {badge_html}
-            <a class="se-link" href="{prop['streeteasy']}" target="_blank">View on StreetEasy &rarr;</a>
         </div>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown(f"[View on StreetEasy →]({prop['streeteasy']})")
 
 # ---------------------------------------------------------------------------
 # Per-property tabs
@@ -476,12 +476,7 @@ for tab, (name, prop) in zip(tabs, PROPERTIES.items()):
         img_col, detail_col = st.columns([1, 2], gap="large")
         with img_col:
             st.image(prop["image"], use_container_width=True)
-            st.markdown(
-                f'<a class="se-link" href="{prop["streeteasy"]}" target="_blank" '
-                f'style="font-size:0.82rem;color:#60a5fa;text-decoration:none;font-weight:500;">'
-                f'StreetEasy Listing &rarr;</a>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f"[StreetEasy Listing →]({prop['streeteasy']})")
         with detail_col:
             st.markdown(f"""
             <div style="margin-top:0.3rem;">
