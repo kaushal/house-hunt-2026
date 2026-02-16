@@ -374,6 +374,19 @@ def styled_chart(fig, height=420):
     return fig
 
 
+def range_metric(label: str, lo_val: str, hi_val: str, delta: str = ""):
+    delta_html = f'<div style="font-size:0.75rem;color:#8a8780;margin-top:0.15rem;">{delta}</div>' if delta else ""
+    return f"""
+    <div style="background:#1a1d23;border:1px solid #2a2d35;border-radius:10px;padding:0.9rem 1rem;">
+        <div style="font-size:0.72rem;color:#8a8780;text-transform:uppercase;letter-spacing:0.06em;">{label}</div>
+        <div style="color:#e8e6e1;font-weight:600;font-size:1.15rem;margin-top:0.25rem;">
+            {lo_val} <span style="color:#8a8780;font-weight:400;font-size:0.85rem;">–</span> {hi_val}
+        </div>
+        {delta_html}
+    </div>
+    """
+
+
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
@@ -387,7 +400,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="section-head">Loan Parameters</div>', unsafe_allow_html=True)
-    interest_rate = st.slider("Interest Rate (%)", 3.0, 10.0, 6.75, 0.125)
+    rate_lo, rate_hi = st.slider("Interest Rate Range (%)", 3.0, 10.0, (5.425, 5.8), 0.125)
     loan_term = st.selectbox("Loan Term (years)", [30, 25, 20, 15], index=0)
 
     st.markdown('<div class="section-head">Market Assumptions</div>', unsafe_allow_html=True)
@@ -479,10 +492,12 @@ for tab, (name, prop) in zip(tabs, PROPERTIES.items()):
         down_pct = down_pcts[name]
         down_payment = price * down_pct / 100
         loan_amount = price - down_payment
-        monthly_pmt = monthly_mortgage(loan_amount, interest_rate, loan_term)
+        monthly_pmt_lo = monthly_mortgage(loan_amount, rate_lo, loan_term)
+        monthly_pmt_hi = monthly_mortgage(loan_amount, rate_hi, loan_term)
         taxes = prop["taxes_monthly"]
         hoa = prop["common_charges_monthly"]
-        total_monthly = monthly_pmt + taxes + hoa
+        total_monthly_lo = monthly_pmt_lo + taxes + hoa
+        total_monthly_hi = monthly_pmt_hi + taxes + hoa
 
         # ---- Header row with image ----
         img_col, detail_col = st.columns([1, 2], gap="large")
@@ -510,21 +525,21 @@ for tab, (name, prop) in zip(tabs, PROPERTIES.items()):
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Down Payment", f"${down_payment:,.0f}", f"{down_pct}%")
         c2.metric("Loan Amount", f"${loan_amount:,.0f}")
-        c3.metric("Monthly Mortgage", f"${monthly_pmt:,.0f}")
-        c4.metric("Total Monthly", f"${total_monthly:,.0f}")
+        c3.markdown(range_metric("Monthly Mortgage", f"${monthly_pmt_lo:,.0f}", f"${monthly_pmt_hi:,.0f}"), unsafe_allow_html=True)
+        c4.markdown(range_metric("Total Monthly", f"${total_monthly_lo:,.0f}", f"${total_monthly_hi:,.0f}"), unsafe_allow_html=True)
 
         # ---- Cost breakdown bar ----
-        mort_pct = monthly_pmt / total_monthly * 100
-        tax_pct = taxes / total_monthly * 100
-        hoa_pct = hoa / total_monthly * 100
+        mort_pct = monthly_pmt_lo / total_monthly_lo * 100
+        tax_pct = taxes / total_monthly_lo * 100
+        hoa_pct = hoa / total_monthly_lo * 100
         st.markdown(f"""
         <div class="cost-bar">
-            <div class="cost-mortgage" style="width:{mort_pct:.1f}%">Mortgage ${monthly_pmt:,.0f}</div>
+            <div class="cost-mortgage" style="width:{mort_pct:.1f}%">Mortgage ${monthly_pmt_lo:,.0f} – ${monthly_pmt_hi:,.0f}</div>
             <div class="cost-tax" style="width:{tax_pct:.1f}%">Tax ${taxes:,}</div>
             <div class="cost-hoa" style="width:{hoa_pct:.1f}%">HOA ${hoa:,}</div>
         </div>
         <div class="cost-legend">
-            ${total_monthly:,.0f}/mo &middot; ${total_monthly*12:,.0f}/yr
+            ${total_monthly_lo:,.0f} – ${total_monthly_hi:,.0f}/mo &middot; ${total_monthly_lo*12:,.0f} – ${total_monthly_hi*12:,.0f}/yr
         </div>
         """, unsafe_allow_html=True)
 
@@ -532,12 +547,17 @@ for tab, (name, prop) in zip(tabs, PROPERTIES.items()):
         st.markdown('<div class="section-head">Value & Equity Projection</div>', unsafe_allow_html=True)
 
         values = appreciation_series(price, appreciation_rate, projection_years)
-        balances, _, _, _ = amortization_schedule(loan_amount, interest_rate, loan_term)
+        balances_lo, _, _, _ = amortization_schedule(loan_amount, rate_lo, loan_term)
+        balances_hi, _, _, _ = amortization_schedule(loan_amount, rate_hi, loan_term)
         months = list(range(projection_years * 12 + 1))
-        bal_padded = [loan_amount] + balances[: projection_years * 12]
+        bal_padded = [loan_amount] + balances_lo[: projection_years * 12]
+        bal_padded_hi = [loan_amount] + balances_hi[: projection_years * 12]
         while len(bal_padded) < len(months):
             bal_padded.append(0)
+        while len(bal_padded_hi) < len(months):
+            bal_padded_hi.append(0)
         total_equity = [v - b for v, b in zip(values, bal_padded)]
+        total_equity_hi = [v - b for v, b in zip(values, bal_padded_hi)]
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
@@ -561,20 +581,22 @@ for tab, (name, prop) in zip(tabs, PROPERTIES.items()):
         # Milestones
         yr5_val = values[min(60, len(values) - 1)]
         yr10_val = values[min(120, len(values) - 1)]
-        yr5_eq = total_equity[min(60, len(total_equity) - 1)]
-        yr10_eq = total_equity[min(120, len(total_equity) - 1)]
+        yr5_eq_lo = total_equity[min(60, len(total_equity) - 1)]
+        yr5_eq_hi = total_equity_hi[min(60, len(total_equity_hi) - 1)]
+        yr10_eq_lo = total_equity[min(120, len(total_equity) - 1)]
+        yr10_eq_hi = total_equity_hi[min(120, len(total_equity_hi) - 1)]
 
         mc1, mc2, mc3, mc4 = st.columns(4)
         mc1.metric("Value @ 5yr", f"${yr5_val:,.0f}", f"{(yr5_val/price - 1)*100:+.1f}%")
-        mc2.metric("Equity @ 5yr", f"${yr5_eq:,.0f}")
+        mc2.markdown(range_metric("Equity @ 5yr", f"${yr5_eq_hi:,.0f}", f"${yr5_eq_lo:,.0f}"), unsafe_allow_html=True)
         if projection_years >= 10:
             mc3.metric("Value @ 10yr", f"${yr10_val:,.0f}", f"{(yr10_val/price - 1)*100:+.1f}%")
-            mc4.metric("Equity @ 10yr", f"${yr10_eq:,.0f}")
+            mc4.markdown(range_metric("Equity @ 10yr", f"${yr10_eq_hi:,.0f}", f"${yr10_eq_lo:,.0f}"), unsafe_allow_html=True)
 
         # ---- Amortization ----
         if show_amort:
             st.markdown('<div class="section-head">Amortization Breakdown</div>', unsafe_allow_html=True)
-            _, princ_arr, int_arr, _ = amortization_schedule(loan_amount, interest_rate, loan_term)
+            _, princ_arr, int_arr, _ = amortization_schedule(loan_amount, rate_lo, loan_term)
             amort_months = list(range(1, min(projection_years * 12, len(princ_arr)) + 1))
 
             fig2 = go.Figure()
@@ -616,14 +638,18 @@ if show_comparison:
         dp = down_pcts[name]
         down = price * dp / 100
         loan = price - down
-        mpmt = monthly_mortgage(loan, interest_rate, loan_term)
+        mpmt_lo = monthly_mortgage(loan, rate_lo, loan_term)
+        mpmt_hi = monthly_mortgage(loan, rate_hi, loan_term)
         taxes = prop["taxes_monthly"]
         hoa = prop["common_charges_monthly"]
-        total = mpmt + taxes + hoa
+        total_lo = mpmt_lo + taxes + hoa
+        total_hi = mpmt_hi + taxes + hoa
         val5 = appreciation_series(price, appreciation_rate, 5)[60]
         val10 = appreciation_series(price, appreciation_rate, 10)[120]
-        bal5 = amortization_schedule(loan, interest_rate, loan_term)[0][min(59, loan_term * 12 - 1)]
-        bal10 = amortization_schedule(loan, interest_rate, loan_term)[0][min(119, loan_term * 12 - 1)]
+        bal5_lo = amortization_schedule(loan, rate_lo, loan_term)[0][min(59, loan_term * 12 - 1)]
+        bal5_hi = amortization_schedule(loan, rate_hi, loan_term)[0][min(59, loan_term * 12 - 1)]
+        bal10_lo = amortization_schedule(loan, rate_lo, loan_term)[0][min(119, loan_term * 12 - 1)]
+        bal10_hi = amortization_schedule(loan, rate_hi, loan_term)[0][min(119, loan_term * 12 - 1)]
 
         rows.append({
             "Property": prop["address"],
@@ -631,17 +657,17 @@ if show_comparison:
             "Price": f"${price:,.0f}",
             "$/SF": f"${price/prop['sqft']:,.0f}",
             "Down Payment": f"${down:,.0f} ({dp}%)",
-            "Monthly Mortgage": f"${mpmt:,.0f}",
+            "Monthly Mortgage": f"${mpmt_lo:,.0f} – ${mpmt_hi:,.0f}",
             "Taxes/mo": f"${taxes:,}",
             "HOA/mo": f"${hoa:,}",
-            "Total Monthly": f"${total:,.0f}",
-            "Total Annual": f"${total*12:,.0f}",
+            "Total Monthly": f"${total_lo:,.0f} – ${total_hi:,.0f}",
+            "Total Annual": f"${total_lo*12:,.0f} – ${total_hi*12:,.0f}",
             "Value @ 5yr": f"${val5:,.0f}",
-            "Equity @ 5yr": f"${val5-bal5:,.0f}",
+            "Equity @ 5yr": f"${val5-bal5_hi:,.0f} – ${val5-bal5_lo:,.0f}",
             "Value @ 10yr": f"${val10:,.0f}",
-            "Equity @ 10yr": f"${val10-bal10:,.0f}",
-            "Total Paid 5yr": f"${total*60:,.0f}",
-            "Total Paid 10yr": f"${total*120:,.0f}",
+            "Equity @ 10yr": f"${val10-bal10_hi:,.0f} – ${val10-bal10_lo:,.0f}",
+            "Total Paid 5yr": f"${total_lo*60:,.0f} – ${total_hi*60:,.0f}",
+            "Total Paid 10yr": f"${total_lo*120:,.0f} – ${total_hi*120:,.0f}",
         })
 
     df = pd.DataFrame(rows).set_index("Property").T
@@ -670,7 +696,7 @@ if show_comparison:
             dp = down_pcts[name]
             loan = price - price * dp / 100
             vals = appreciation_series(price, appreciation_rate, projection_years)
-            bals = [loan] + list(amortization_schedule(loan, interest_rate, loan_term)[0][: projection_years * 12])
+            bals = [loan] + list(amortization_schedule(loan, rate_lo, loan_term)[0][: projection_years * 12])
             while len(bals) < len(vals):
                 bals.append(0)
             eq = [v - b for v, b in zip(vals, bals)]
