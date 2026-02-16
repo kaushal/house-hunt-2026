@@ -394,6 +394,18 @@ with st.sidebar:
     appreciation_rate = st.slider("Annual Appreciation (%)", -5.0, 10.0, 3.0, 0.25)
     projection_years = st.slider("Projection Horizon (years)", 5, 30, 30, 1)
 
+    st.markdown('<div class="section-head">Offer Price</div>', unsafe_allow_html=True)
+    offer_prices = {}
+    for name, prop in PROPERTIES.items():
+        offer_prices[name] = st.number_input(
+            f"{name}",
+            min_value=0,
+            value=prop["price"],
+            step=25_000,
+            format="%d",
+            key=f"price_{name}",
+        )
+
     st.markdown('<div class="section-head">Down Payment</div>', unsafe_allow_html=True)
     down_pcts = {}
     for name, prop in PROPERTIES.items():
@@ -463,7 +475,7 @@ tabs = st.tabs([name for name in PROPERTIES])
 
 for tab, (name, prop) in zip(tabs, PROPERTIES.items()):
     with tab:
-        price = prop["price"]
+        price = offer_prices[name]
         down_pct = down_pcts[name]
         down_payment = price * down_pct / 100
         loan_amount = price - down_payment
@@ -600,7 +612,7 @@ if show_comparison:
 
     rows = []
     for name, prop in PROPERTIES.items():
-        price = prop["price"]
+        price = offer_prices[name]
         dp = down_pcts[name]
         down = price * dp / 100
         loan = price - down
@@ -642,7 +654,7 @@ if show_comparison:
         st.markdown('<div class="section-head">Value Appreciation</div>', unsafe_allow_html=True)
         fig_comp = go.Figure()
         for i, (name, prop) in enumerate(PROPERTIES.items()):
-            vals = appreciation_series(prop["price"], appreciation_rate, projection_years)
+            vals = appreciation_series(offer_prices[name], appreciation_rate, projection_years)
             fig_comp.add_trace(go.Scatter(
                 x=[m / 12 for m in range(len(vals))], y=vals,
                 name=name, line=dict(width=2, color=CHART_COLORS[i]),
@@ -654,7 +666,7 @@ if show_comparison:
         st.markdown('<div class="section-head">Total Equity</div>', unsafe_allow_html=True)
         fig_eq = go.Figure()
         for i, (name, prop) in enumerate(PROPERTIES.items()):
-            price = prop["price"]
+            price = offer_prices[name]
             dp = down_pcts[name]
             loan = price - price * dp / 100
             vals = appreciation_series(price, appreciation_rate, projection_years)
