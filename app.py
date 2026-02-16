@@ -59,7 +59,7 @@ html, body, .stApp {
 }
 
 /* Kill streamlit defaults */
-header[data-testid="stHeader"] { display: none !important; }
+header[data-testid="stHeader"] { background: transparent !important; }
 #MainMenu { display: none !important; }
 footer { display: none !important; }
 .stDeployButton { display: none !important; }
